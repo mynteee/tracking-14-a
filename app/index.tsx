@@ -1,6 +1,52 @@
+import Paho from "paho-mqtt";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 
+function onConnectionLost(responseObject: any) {
+  if (responseObject.errorCode !== 0) {
+    console.log("onConnectionLost:" + responseObject.errorMessage);
+  }
+}
+
 export default function Index() {
+  const [data, setData] = useState("Waiting for data...");
+  const [status, setStatus] = useState("Disconnected");
+  
+  useEffect(() => {
+    console.log("Connecting to MQTT broker...");
+    const client = new Paho.Client("172.20.10.2", 9001, `client-${Date.now()}`);
+    client.onConnectionLost = onConnectionLost;
+    
+    client.onMessageArrived = (message: any) => {
+      console.log("Topic:", message.destinationName);
+      console.log("Payload:", message.payloadString);
+      setData(`${message.destinationName}: ${message.payloadString}`);
+    };
+
+    client.connect({
+      onSuccess: () => {
+        setStatus("Connected to MQTT broker");
+        console.log("Connected to MQTT broker");
+        client.subscribe("espresense/#", {
+          qos: 0,
+          onSuccess: () => {
+            console.log("Subscribed to espresense/#");
+            setStatus("Subscribed to espresense/#");
+          },
+          onFailure: (err: any) => {
+            console.log("Subscribe failed:", err);
+            setStatus("Subscribe failed");
+          },
+        });
+      },
+      onFailure: (error) => {
+        setStatus("Failed to connect to MQTT broker");
+        console.error("Failed to connect to MQTT broker", error);
+      }
+    });
+  }, []);
+  
+
   return (
     <View
       style={{
@@ -8,8 +54,10 @@ export default function Index() {
         justifyContent: "center",
         alignItems: "center",
       }}
-    >
-     <b>Welcome to Expo gooning!</b> 
+    > 
+      <b>Welcome to Expo gooning!</b> 
+      <p>Status: {status}</p>
+      <p>Data: {data}</p>
     </View>
   );
 }
