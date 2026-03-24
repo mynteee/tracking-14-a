@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import Paho from "paho-mqtt";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
@@ -7,6 +8,9 @@ function onConnectionLost(responseObject: any) {
     console.log("onConnectionLost:" + responseObject.errorMessage);
   }
 }
+
+const blurhash = '|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXofj[ayj[j[fQayWCoeoeaya}j[ayfQa{oLj?j[WVj[ayayj[fQoff7azayj[ayj[j[ayofayayayj[fQj[ayayj[ayfjj[j[ayjuayj[';
+
 
 export default function Index() {
   const [data, setData] = useState("Waiting for data...");
@@ -51,13 +55,24 @@ export default function Index() {
     <View
       style={{
         flex: 1,
-        justifyContent: "center",
+        justifyContent: "flex-start",
         alignItems: "center",
       }}
     > 
-      <b>Welcome to Expo gooning!</b> 
+      <b>Malware</b> 
       <p>Status: {status}</p>
       <p>Data: {data}</p>
+      <Image
+        style={{
+          flex: 1,
+          width: '100%',
+          backgroundColor: '#0553'
+        }}
+        source={require("../assets/floor1.png")}
+        placeholder={{ blurhash }}
+        contentFit="cover"
+        transition={1000}
+      />
     </View>
   );
 }
