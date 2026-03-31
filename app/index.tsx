@@ -24,19 +24,19 @@ const clearAppStorage = async () => {
   }
 };
 
-const testData = () => {
-  return JSON.stringify({
-    "e2342354": {
-      "closestRoom": "room_1",
-      "distance": 1.12,
+const testData = async () => {
+  await AsyncStorage.setItem("e2342354", JSON.stringify({
+      "room_1": 0.35,
+      "room_2": 0.45,
+      "room_3": 0.21,
       "alias": "tracker"+ Math.floor(Math.random() * 1000)
-    },
-    "f2354938dd": {
-      "closestRoom": "room_2",
-      "distance": 0.9,
+    }));
+  await AsyncStorage.setItem("f2354938dd", JSON.stringify({
+      "room_1": 0.55,
+      "room_2": 0.21,
+      "room_3": 0.9,
       "alias": "tracker"+ Math.floor(Math.random() * 1000)
-    }
-  }, null, 2);
+    }));
 }
 
 const loadStorageSorted = async () => {
@@ -66,6 +66,7 @@ const loadStorageSorted = async () => {
     data[key] = { closestRoom, distance: minDistance, alias };
   });
 
+  console.log("Loaded and sorted storage data:", JSON.stringify(data));
   return data; // Return JSON data
 };
 
@@ -75,10 +76,12 @@ export default function Index() {
 
   useEffect(() => {
     // 1. Initialize with Test Data immediately
-    setSidebarData(JSON.parse(testData()));
+    (async () => {
+      await testData();
+      const sorted = await loadStorageSorted();
+      setSidebarData(sorted);
+    })();
 
-    clearAppStorage();
-    
     // 2. Setup MQTT logic
     const client = new Paho.Client("10.0.0.250", 9001, `client-${Date.now()}`);
     
