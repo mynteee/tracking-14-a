@@ -28,7 +28,7 @@ const testData = () => {
   return JSON.stringify({
     "e2342354": {
       "closestRoom": "room_1",
-      "distance": 1.2,
+      "distance": 1.12,
       "alias": "tracker"+ Math.floor(Math.random() * 1000)
     },
     "f2354938dd": {
@@ -43,58 +43,39 @@ const loadStorageSorted = async () => {
   const keys = await AsyncStorage.getAllKeys();
   const pairs = await AsyncStorage.multiGet(keys);
 
-  const data: Record<string, { closestRoom: string | null; distance: number | null }> = {};
+  const data: Record<string, { closestRoom: string | null; distance: number | null; alias: string | null }> = {};
   
-  // Create a temporary storage for the raw distances
-  const rawData: Record<string, Record<string, number | null>> = {};
-
   pairs.forEach(([key, value]) => {
-    if (value) rawData[key] = JSON.parse(value);
-  });
+    if (!value) return;
 
-  // Calculate the closest room for each ID
-  for (const [id, distances] of Object.entries(rawData)) {
+    const parsed: Record<string, number | string | null> = JSON.parse(value);
+    const alias = parsed.alias as string | null;
+
     let closestRoom: string | null = null;
     let minDistance: number | null = null;
 
-    for (const [room, dist] of Object.entries(distances)) {
-      if (dist !== null && (minDistance === null || dist < minDistance)) {
-        minDistance = dist;
+    for (const [room, dist] of Object.entries(parsed)) {
+      if (room === 'alias') continue; // skip the alias key
+      const distance = dist as number | null;
+      if (distance !== null && (minDistance === null || distance < minDistance)) {
+        minDistance = distance;
         closestRoom = room;
       }
     }
-    data[id] = { closestRoom, distance: minDistance };
-  }
 
-  return data; // Return the object directly instead of a string
+    data[key] = { closestRoom, distance: minDistance, alias };
+  });
+
+  return data; // Return JSON data
 };
-
-// ... (keep your imports and styles the same)
 
 export default function Index() {
   const [sidebarData, setSidebarData] = useState<Record<string, any>>({});
   const [status, setStatus] = useState("Disconnected");
 
-  // Your provided test function (returns a string)
-  const getTestData = () => {
-    return JSON.stringify({
-      "e2342354": {
-        "closestRoom": "room_1",
-        "distance": 1.2,
-        "alias": "tracker" + Math.floor(Math.random() * 1000)
-      },
-      "f2354938dd": {
-        "closestRoom": "room_2",
-        "distance": 0.9,
-        "alias": "tracker" + Math.floor(Math.random() * 1000)
-      }
-    }, null, 2);
-  }
-
   useEffect(() => {
     // 1. Initialize with Test Data immediately
-    const rawTestData = getTestData();
-    setSidebarData(JSON.parse(rawTestData));
+    setSidebarData(JSON.parse(testData()));
 
     clearAppStorage();
     
@@ -110,7 +91,7 @@ export default function Index() {
         if (parsed.id.includes("known:")) {
           const id = parsed.id.split(":")[1];
           const current = await AsyncStorage.getItem(id);
-          let values = current ? JSON.parse(current) : { "room_1": null, "room_2": null, "room_3": null };
+          let values = current ? JSON.parse(current) : { "room_1": null, "room_2": null, "room_3": null, alias: `tracker-${Math.floor(Math.random() * 1000)}` };
           
           values[room] = distance;
           await AsyncStorage.setItem(id, JSON.stringify(values));
