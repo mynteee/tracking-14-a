@@ -66,8 +66,23 @@ const loadStorageSorted = async () => {
   return JSON.stringify(data, null, 2);
 };
 
+const testData = () => {
+  return JSON.stringify({
+    "e2342354": {
+      "closestRoom": "room_1",
+      "distance": 1.2,
+      "alias": "tracker"+ Math.floor(Math.random() * 1000)
+    },
+    "f2354938dd": {
+      "closestRoom": "room_2",
+      "distance": 0.9,
+      "alias": "tracker"+ Math.floor(Math.random() * 1000)
+    }
+  }, null, 2);
+}
+
 export default function Index() {
-  const [data, setData] = useState("Waiting for data...");
+  const [data, setData] = useState(testData());
   const [status, setStatus] = useState("Disconnected");
   
   useEffect(() => {
@@ -138,8 +153,7 @@ export default function Index() {
         alignItems: "center",
       }}
     > 
-      <p>Status: {status}</p>
-      <p>Data: {data}</p>
+
       <Image
         style={{
           flex: 1,
@@ -148,7 +162,7 @@ export default function Index() {
         }}
         source={require("../assets/floor1.png")}
         placeholder={{ blurhash }}
-        contentFit="cover"
+        contentFit="contain"
         transition={1000}
       />
     </View>
