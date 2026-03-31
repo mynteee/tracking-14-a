@@ -2,11 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 import Paho from "paho-mqtt";
 import { useEffect, useState } from "react";
-import { View } from "react-native";
-
-/*
-I have no idea what Im doing I also didn't comment so lowk kinda cooked
-*/
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 const blurhash = '|rF?hV%2WCj[ayj[a|j[az_NaeWBj@ayfRayfQfQM{M|azj[azf6fQfQfQIpWXofj[ayj[j[fQayWCoeoeaya}j[ayfQa{oLj?j[WVj[ayayj[fQoff7azayj[ayj[j[ayofayayayj[fQj[ayayj[ayfjj[j[ayjuayj[';
 const rooms = ["room_1", "room_2", "room_3"];
@@ -28,44 +24,6 @@ const clearAppStorage = async () => {
   }
 };
 
-const loadStorageSorted = async () => {
-  const keys = await AsyncStorage.getAllKeys();
-  const pairs = await AsyncStorage.multiGet(keys);
-
-  const data: Record<string, Record<string, number | null> | { closestRoom: string | null; distance: number | null }> = {};
-  pairs.forEach(([key, value]) => {
-    if (value) {    
-      data[key] = JSON.parse(value);
-    }
-  });
-
-  for (const [id, rooms] of Object.entries(data)) {
-    let closestRoom: string | null = null;
-    let minDistance: number | null = null;
-
-    if (typeof rooms === 'object' && 'closestRoom' in rooms) {
-      continue;
-    }
-
-    for (const room of  Object.keys(rooms)) {
-      const distance = (rooms as Record<string, number | null>)[room];
-      if (distance !== null && (minDistance === null || distance < minDistance)) {
-        minDistance = distance;
-        closestRoom = room;
-      }
-    }
-
-    if (closestRoom) {
-      data[id] = { closestRoom, distance: minDistance };
-    } else {
-      data[id] = { closestRoom: null, distance: null };
-    }
-  }
-
-  console.log(data);
-  return JSON.stringify(data, null, 2);
-};
-
 const testData = () => {
   return JSON.stringify({
     "e2342354": {
@@ -81,90 +39,197 @@ const testData = () => {
   }, null, 2);
 }
 
-export default function Index() {
-  const [data, setData] = useState(testData());
-  const [status, setStatus] = useState("Disconnected");
+const loadStorageSorted = async () => {
+  const keys = await AsyncStorage.getAllKeys();
+  const pairs = await AsyncStorage.multiGet(keys);
+
+  const data: Record<string, { closestRoom: string | null; distance: number | null }> = {};
   
+  // Create a temporary storage for the raw distances
+  const rawData: Record<string, Record<string, number | null>> = {};
+
+  pairs.forEach(([key, value]) => {
+    if (value) rawData[key] = JSON.parse(value);
+  });
+
+  // Calculate the closest room for each ID
+  for (const [id, distances] of Object.entries(rawData)) {
+    let closestRoom: string | null = null;
+    let minDistance: number | null = null;
+
+    for (const [room, dist] of Object.entries(distances)) {
+      if (dist !== null && (minDistance === null || dist < minDistance)) {
+        minDistance = dist;
+        closestRoom = room;
+      }
+    }
+    data[id] = { closestRoom, distance: minDistance };
+  }
+
+  return data; // Return the object directly instead of a string
+};
+
+// ... (keep your imports and styles the same)
+
+export default function Index() {
+  const [sidebarData, setSidebarData] = useState<Record<string, any>>({});
+  const [status, setStatus] = useState("Disconnected");
+
+  // Your provided test function (returns a string)
+  const getTestData = () => {
+    return JSON.stringify({
+      "e2342354": {
+        "closestRoom": "room_1",
+        "distance": 1.2,
+        "alias": "tracker" + Math.floor(Math.random() * 1000)
+      },
+      "f2354938dd": {
+        "closestRoom": "room_2",
+        "distance": 0.9,
+        "alias": "tracker" + Math.floor(Math.random() * 1000)
+      }
+    }, null, 2);
+  }
+
   useEffect(() => {
+    // 1. Initialize with Test Data immediately
+    const rawTestData = getTestData();
+    setSidebarData(JSON.parse(rawTestData));
+
     clearAppStorage();
-    console.log("Connecting to MQTT broker...");
-    const client = new Paho.Client("10.0.0.250", 9001, `client-${Date.now()}`);
-    client.onConnectionLost = onConnectionLost;
     
-    /*
-    very impt but im too lazy to explain it
-    */
+    // 2. Setup MQTT logic
+    const client = new Paho.Client("10.0.0.250", 9001, `client-${Date.now()}`);
+    
     client.onMessageArrived = async (message: any) => {
       try {
         const parsed = JSON.parse(message.payloadString);
         const distance = parseFloat(parsed.distance);
         const room = message.destinationName.split("/").at(-1);
+
         if (parsed.id.includes("known:")) {
           const id = parsed.id.split(":")[1];
           const current = await AsyncStorage.getItem(id);
-          if(current){
-            var values = JSON.parse(current);
-            values[room] = distance;
-            await AsyncStorage.setItem(id, JSON.stringify(values));
-          } else {
-            const values: Record<string, number | null> = {
-              "room_1": null, "room_2": null, "room_3": null
-            };            
-            values[room] = distance;
-            await AsyncStorage.setItem(id, JSON.stringify(values));
-          }
-          setData(await loadStorageSorted());
+          let values = current ? JSON.parse(current) : { "room_1": null, "room_2": null, "room_3": null };
+          
+          values[room] = distance;
+          await AsyncStorage.setItem(id, JSON.stringify(values));
+          
+          // Overwrite test data with real live data as it comes in
+          const sorted = await loadStorageSorted();
+          setSidebarData(sorted);
         }
-      } catch {
-        
+      } catch (e) {
+        console.error("MQTT Error:", e);
       }
-      
     };
 
     client.connect({
       onSuccess: () => {
-        setStatus("Connected to MQTT broker");
-        console.log("Connected to MQTT broker");
-        client.subscribe("espresense/#", {
-          qos: 0,
-          onSuccess: () => {
-            console.log("Subscribed to espresense/#");
-            setStatus("Subscribed to espresense/#");
-          },
-          onFailure: (err: any) => {
-            console.log("Subscribe failed:", err);
-            setStatus("Subscribe failed");
-          },
-        });
+        setStatus("Connected");
+        client.subscribe("espresense/#");
       },
-      onFailure: (error) => {
-        setStatus("Failed to connect to MQTT broker");
-        console.error("Failed to connect to MQTT broker", error);
-      }
+      onFailure: () => setStatus("Failed to connect")
     });
+
+    return () => {
+      if (client.isConnected()) client.disconnect();
+    };
   }, []);
-  
 
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "flex-start",
-        alignItems: "center",
-      }}
-    > 
-
+    <View style={styles.container}>
       <Image
-        style={{
-          flex: 1,
-          width: '100%',
-          backgroundColor: '#0553'
-        }}
+        style={styles.map}
         source={require("../assets/floor1.png")}
         placeholder={{ blurhash }}
-        contentFit="contain"
-        transition={1000}
+        contentFit="cover"
       />
+
+      <View style={styles.sidebar}>
+        <Text style={styles.title}>Device Locations</Text>
+        <Text style={[styles.status, { color: status === "Connected" ? "green" : "red" }]}>
+          {status}
+        </Text>
+        
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {Object.entries(sidebarData).map(([id, info]) => (
+            <View key={id} style={styles.card}>
+              {/* Added Alias display since your test data includes it */}
+              <Text style={styles.deviceId}>{info.alias || id}</Text>
+              <Text style={styles.roomText}>
+                📍 {info.closestRoom || "Searching..."} 
+                {info.distance ? ` • ${info.distance.toFixed(2)}m` : ""}
+              </Text>
+              {info.alias && <Text style={{fontSize: 10, color: '#aaa'}}>ID: {id}</Text>}
+            </View>
+          ))}
+          
+          {Object.keys(sidebarData).length === 0 && (
+            <Text style={{ textAlign: 'center', marginTop: 20, color: '#999' }}>
+              No devices detected...
+            </Text>
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: -1,
+  },
+  sidebar: {
+    width: 260,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    borderRightWidth: 1,
+    borderRightColor: '#ddd',
+    height: '100%',
+    // Glassmorphism effect for Web/iOS
+    shadowColor: "#000",
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 5,
+  },
+  status: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 25,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
+    elevation: 3, // Android shadow
+  },
+  deviceId: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+  },
+  roomText: {
+    color: '#666',
+    fontSize: 13,
+    marginTop: 6,
+    fontWeight: '500',
+  }
+});
