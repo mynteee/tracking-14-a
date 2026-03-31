@@ -28,7 +28,7 @@ const clearAppStorage = async () => {
   }
 };
 
-const loadStorage = async () => {
+const loadStorageSorted = async () => {
   const keys = await AsyncStorage.getAllKeys();
   const pairs = await AsyncStorage.multiGet(keys);
 
@@ -98,17 +98,7 @@ export default function Index() {
             values[room] = distance;
             await AsyncStorage.setItem(id, JSON.stringify(values));
           }
-          /*
-          if(current != null){
-            if(distance < parseFloat(current.split(",")[1])) {
-              await AsyncStorage.setItem(id, [room, distance].join(","));
-            }
-          } else {
-            await AsyncStorage.setItem(id, [room, distance].join(","));
-          }
-            */
-          // console.log(current, [parsed,distance].join(","));
-          setData(await loadStorage());
+          setData(await loadStorageSorted());
         }
       } catch {
         
@@ -148,7 +138,6 @@ export default function Index() {
         alignItems: "center",
       }}
     > 
-      <b>Malware</b> 
       <p>Status: {status}</p>
       <p>Data: {data}</p>
       <Image
