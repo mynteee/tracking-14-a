@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Paho from "paho-mqtt";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -8,10 +9,15 @@ import type { DeviceLocation, RoomTelemetry } from "../types/tracking";
 
 type DeviceObservationMap = Record<string, Record<string, DeviceLocation>>;
 type RoomTelemetryMap = Record<string, RoomTelemetry>;
+type PersistedTrackingFeed = {
+  deviceObservations: DeviceObservationMap;
+  roomTelemetry: RoomTelemetryMap;
+};
 
 const COORDINATE_OBSERVATION_KEY = "__coordinates__";
 const UNMAPPED_OBSERVATION_KEY = "__unmapped__";
 const OBSERVATION_TTL_MS = 30_000;
+const TRACKING_CACHE_KEY = "@tracking_feed_cache_v1";
 
 function observationKey(location: DeviceLocation) {
   if (location.source === "coordinates") {
@@ -60,6 +66,8 @@ export function useTrackingFeed() {
     useState<DeviceObservationMap>({});
   const [roomTelemetry, setRoomTelemetry] = useState<RoomTelemetryMap>({});
   const [status, setStatus] = useState("Disconnected");
+  const hasLoadedCacheRef = useRef(false);
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageHandlerRef = useRef((message: Paho.Message) => {
     const telemetryUpdate = parseRoomTelemetryUpdate({
       floors: floorMaps,
@@ -107,6 +115,70 @@ export function useTrackingFeed() {
       ),
     [],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCachedFeed = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(TRACKING_CACHE_KEY);
+        if (!stored || cancelled) {
+          return;
+        }
+
+        const parsed = JSON.parse(stored) as Partial<PersistedTrackingFeed>;
+
+        if (parsed.deviceObservations && typeof parsed.deviceObservations === "object") {
+          setDeviceObservations(parsed.deviceObservations as DeviceObservationMap);
+        }
+
+        if (parsed.roomTelemetry && typeof parsed.roomTelemetry === "object") {
+          setRoomTelemetry(parsed.roomTelemetry as RoomTelemetryMap);
+        }
+      } catch (error) {
+        console.error("Failed to load tracking cache", error);
+      } finally {
+        if (!cancelled) {
+          hasLoadedCacheRef.current = true;
+        }
+      }
+    };
+
+    void loadCachedFeed();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedCacheRef.current) {
+      return;
+    }
+
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current);
+    }
+
+    persistTimeoutRef.current = setTimeout(() => {
+      void AsyncStorage.setItem(
+        TRACKING_CACHE_KEY,
+        JSON.stringify({
+          deviceObservations,
+          roomTelemetry,
+        } satisfies PersistedTrackingFeed),
+      ).catch((error) => {
+        console.error("Failed to persist tracking cache", error);
+      });
+    }, 150);
+
+    return () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+        persistTimeoutRef.current = null;
+      }
+    };
+  }, [deviceObservations, roomTelemetry]);
 
   useEffect(() => {
     const clientId = `tracking-14-a-${Date.now()}`;

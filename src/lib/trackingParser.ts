@@ -356,7 +356,13 @@ export function parseTrackingUpdate({
   const assetCategory = assetCategoryFor(deviceId);
   const label = assetLabelFor(
     deviceId,
-    pickString(parsed?.name, parsed?.deviceName, parsed?.id, trackerIndex) ??
+    pickString(
+      parsed?.alias,
+      parsed?.name,
+      parsed?.deviceName,
+      parsed?.id,
+      trackerIndex,
+    ) ??
       trackerIndex,
   );
 
