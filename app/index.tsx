@@ -1,20 +1,20 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-
 import { FLOOR_VIEWBOX, FLOOR_ZONE_RECTS, FloorPlanCanvas } from "@/src/components/FloorPlanCanvas";
 import { lookupAsset } from "@/src/config/assetRegistry";
 import { floorMaps } from "@/src/config/floorMaps";
 import { useTrackingFeed } from "@/src/hooks/useTrackingFeed";
 import type { DeviceLocation, RoomTelemetry } from "@/src/types/tracking";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Paho from "paho-mqtt";
+import { startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const ALIAS_STORAGE_KEY = "@tracker_aliases";
 const LIVE_WINDOW_MS = 15_000;
 const MAP_CHROME_WIDTH = 356;
 const TIME_FORMATTER = new Intl.DateTimeFormat("en-CA", { hour: "2-digit", minute: "2-digit" });
-
+  const client = new Paho.Client("10.0.0.250", 9001, `client-${Date.now()}`);  
 type EquipmentMode = "all" | "live" | "unplaced";
 type SeededTracker = { alias?: string; deviceId: string; distances: Record<string, number | null> };
 
@@ -79,7 +79,7 @@ function buildTestFeed() {
     adverts: 220 + index * 18,
     firmware: "esp32",
     freeHeap: 89_000 - index * 700,
-    ip: `10.0.0.11${index + 6}`,
+    ip: `10.0.0.250${index + 6}`,
     maxHeap: 62_000 + index * 320,
     reported: 60 + index * 7,
     roomId: anchor.id,
@@ -120,6 +120,7 @@ export default function Index() {
   const [tempName, setTempName] = useState("");
   const [now, setNow] = useState(Date.now());
   const activeFeed = useTestData
+
     ? feed
     : {
         devices: liveFeed.devices,

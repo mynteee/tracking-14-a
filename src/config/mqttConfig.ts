@@ -17,8 +17,8 @@ function normalizeTopicFilter(value: string | undefined) {
 }
 
 export const mqttConfig = {
-  brokerHost: process.env.EXPO_PUBLIC_MQTT_HOST ?? "172.20.10.2",
-  brokerPath: process.env.EXPO_PUBLIC_MQTT_PATH ?? "/mqtt",
+  brokerHost: process.env.EXPO_PUBLIC_MQTT_HOST ?? "10.0.0.250",
+  brokerPath: process.env.EXPO_PUBLIC_MQTT_PATH ?? "",
   brokerPort: Number(process.env.EXPO_PUBLIC_MQTT_PORT ?? "9001"),
   keepAliveSeconds: Number(process.env.EXPO_PUBLIC_MQTT_KEEPALIVE ?? "60"),
   telemetryTopic: process.env.EXPO_PUBLIC_MQTT_TELEMETRY_TOPIC ?? "espresense/rooms/+/telemetry",

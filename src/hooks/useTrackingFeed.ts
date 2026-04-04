@@ -182,12 +182,14 @@ export function useTrackingFeed() {
 
   useEffect(() => {
     const clientId = `tracking-14-a-${Date.now()}`;
-    const client = new Paho.Client(
-      mqttConfig.brokerHost,
-      mqttConfig.brokerPort,
-      mqttConfig.brokerPath,
-      clientId,
-    );
+    const client = mqttConfig.brokerPath
+      ? new Paho.Client(
+          mqttConfig.brokerHost,
+          mqttConfig.brokerPort,
+          mqttConfig.brokerPath,
+          clientId,
+        )
+      : new Paho.Client(mqttConfig.brokerHost, mqttConfig.brokerPort, clientId);
 
     client.onConnectionLost = (response) => {
       if (response.errorCode !== 0) {
